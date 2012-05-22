@@ -1,0 +1,11 @@
+{application, basho_bench_dist,
+ [{description, "Merge the results of differnet Basho Bench runs"},
+  {vsn, "0.1"},
+  {modules, []},
+  {registered, []},
+  {applications, [kernel,
+                  stdlib
+                 ]},
+  {mod, {basho_bench_dist_app, []}},
+  {env, []}
+]}.
