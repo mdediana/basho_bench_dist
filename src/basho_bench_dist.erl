@@ -20,26 +20,22 @@ main(Configs) ->
                                   filelib:wildcard(D ++ "/*histogram.bin")
                               end, InDirs),
 
-    Contents = lists:map(fun(F) ->
-                             {ok, HistBin} = file:read_file(F),
-                             {Hist, Units, Errors} = binary_to_term(HistBin),
-                             Parts = string:tokens(F, "/_"),
-                             Op = lists:nth(length(Parts) - 1, Parts),
-                             {Op, Hist, Units, Errors}
-                         end, Files),
+    OpsDict = lists:foldl(
+            fun(F, Dict) ->
+                {ok, HistBin} = file:read_file(F),
+                HUE = binary_to_term(HistBin), % {Hist, Units, Errors}
+                Parts = string:tokens(F, "/_"),
+                Op = lists:nth(length(Parts) - 1, Parts),
+                dict:append(Op, HUE, Dict)
+            end, dict:new(), Files),
 
-    Ops = lists:usort([ Op || {Op, _, _, _} <- Contents]),
-    Agg = lists:map(
-           fun(Op) ->
-               L = lists:filter(fun(E) -> element(1, E) =:= Op end, Contents),
-               Hists  = [ H || {_, H, _, _} <- L],
-               Units  = [ U || {_, _, U, _} <- L],
-               Errors  = [ E || {_, _, _, E} <- L],
-               {Op,
-                basho_stats_histogram:merge(Hists),
-                lists:sum(Units),
-                lists:sum(Errors)} 
-           end, Ops),
+    Agg = dict:map(
+            fun(_Op, HUE) ->
+                {Hists, Units, Errors} = lists:unzip3(HUE),
+                {basho_stats_histogram:merge(Hists),
+                 lists:sum(Units),
+                 lists:sum(Errors)} 
+            end, OpsDict),
 
     {ok, SummaryFile} = file:open(OutDir ++ "/summary.csv", [raw, binary, write]),
     file:write(SummaryFile, <<"elapsed, window, total, successful, failed\n">>),
@@ -47,20 +43,20 @@ main(Configs) ->
     {ok, ErrorsFile} = file:open(OutDir ++ "/errors.csv", [raw, binary, write]),
     file:write(ErrorsFile, <<"\"error\",\"count\"\n">>),
 
-    State = #state { ops = Ops,
+    State = #state { ops = dict:fetch_keys(OpsDict),
                      start_time = 0,
                      last_write_time = 0,
                      report_interval = 0,
                      errors_since_last_report = false,
                      summary_file = SummaryFile,
                      errors_file = ErrorsFile},
-    process_stats(Duration * 60 + 1, State, Agg).
+    process_stats(Duration * 60 + 1, State, Agg, OutDir).
 
 %% copied from basho_bench, with some slight modifications
-process_stats(Elapsed = Window, State, Agg) ->
+process_stats(Elapsed = Window, State, Agg, OutDir) ->
     %% Time to report latency data to our CSV files
     {Oks, Errors} = lists:foldl(fun(Op, {TotalOks, TotalErrors}) ->
-                                  {Oks, Errors} = report_latency(Elapsed, Window, Op, Agg),
+                                  {Oks, Errors} = report_latency(Elapsed, Window, Op, Agg, OutDir),
                                         {TotalOks + Oks, TotalErrors + Errors}
                                 end, {0,0}, State#state.ops),
 
@@ -77,8 +73,8 @@ process_stats(Elapsed = Window, State, Agg) ->
 %% Write latency info for a given op to the appropriate CSV. Returns the
 %% number of successful and failed ops in this window of time.
 %%
-report_latency(Elapsed, Window, Op, Agg) ->
-    {Op, Hist, Units, Errors} = lists:keyfind(Op, 1, Agg),
+report_latency(Elapsed, Window, Op, Agg, OutDir) ->
+    {Hist, Units, Errors} = dict:fetch(Op, Agg),
     case basho_stats_histogram:observations(Hist) > 0 of
         true ->
             {Min, Mean, Max, _, _} = basho_stats_histogram:summary_stats(Hist),
@@ -101,11 +97,11 @@ report_latency(Elapsed, Window, Op, Agg) ->
                                   Window,
                                   Errors])
     end,
-    ok = file:write(op_csv_file({Op, Op}), Line),
+    ok = file:write(op_csv_file({Op, Op}, OutDir), Line),
     {Units, Errors}.
 
-op_csv_file({Label, _Op}) ->
-    Fname = normalize_label(Label) ++ "_latencies.csv",
+op_csv_file({Label, _Op}, OutDir) ->
+    Fname = OutDir ++ "/" ++ normalize_label(Label) ++ "_latencies.csv",
     {ok, F} = file:open(Fname, [raw, binary, write]),
     ok = file:write(F, <<"elapsed, window, n, min, mean, median, 95th, 99th, 99_9th, max, errors\n">>),
     F.
