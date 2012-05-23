@@ -5,3 +5,4 @@ priv
 *.beam
 *.plt
 basho_bench_dist
+ebin/
