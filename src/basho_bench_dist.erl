@@ -90,21 +90,45 @@ report_latency(Elapsed, Window, Op, Agg, OutDir) ->
                                   float(basho_stats_histogram:quantile(0.990, Hist)),
                                   float(basho_stats_histogram:quantile(0.999, Hist)),
                                   float(Max),
-                                  Errors]);
+                                  Errors]),
+
+            Perc = lists:map(fun(P) ->
+                                 float(basho_stats_histogram:quantile(P, Hist))
+                             end,
+                             [ F / 100 || F <- lists:seq(1, 99) ] ++ [0.999]),
+            LinePerc = io_lib:format(
+                           string:join(lists:duplicate(100, "~.1f"), ", ") ++ "\n",
+                           Perc);
         false ->
             io:format("No data for op: ~p\n", [Op]),
             Line = io_lib:format("~w, ~w, 0, 0, 0, 0, 0, 0, 0, 0, ~w\n",
                                  [Elapsed,
                                   Window,
-                                  Errors])
+                                  Errors]),
+            LinePerc = ""
     end,
     ok = file:write(op_csv_file({Op, Op}, OutDir), Line),
+    ok = file:write(op_perc_file({Op, Op}, OutDir), LinePerc),
     {Units, Errors}.
 
 op_csv_file({Label, _Op}, OutDir) ->
     Fname = OutDir ++ "/" ++ normalize_label(Label) ++ "_latencies.csv",
     {ok, F} = file:open(Fname, [raw, binary, write]),
     ok = file:write(F, <<"elapsed, window, n, min, mean, median, 95th, 99th, 99_9th, max, errors\n">>),
+    F.
+
+op_perc_file({Label, _Op}, OutDir) ->
+    Fname = OutDir ++ "/" ++ normalize_label(Label) ++ "_percentiles.csv",
+    {ok, F} = file:open(Fname, [raw, binary, write]),
+    Header = lists:map(fun(N) ->
+                           case N rem 10 of
+                               1 -> integer_to_list(N) ++ "st";
+                               2 -> integer_to_list(N) ++ "nd";
+                               3 -> integer_to_list(N) ++ "rd";
+                               _ -> integer_to_list(N) ++ "th"
+                           end
+                       end, lists:seq(1, 99)) ++ ["99_9th"],
+    ok = file:write(F, string:concat(string:join(Header, ", "), "\n")),
     F.
 
 normalize_label(Label) when is_list(Label) ->
