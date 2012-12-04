@@ -78,20 +78,18 @@ report_latency(Elapsed, Window, Op, Agg, OutDir) ->
     case basho_stats_histogram:observations(Hist) > 0 of
         true ->
             {Min, Mean, Max, _, _} = basho_stats_histogram:summary_stats(Hist),
-            %Line = io_lib:format("~w, ~w, ~w, ~w, ~.1f, ~.1f, ~.1f, ~.1f, ~.1f, ~w, ~w\n",
-            Line = io_lib:format("~w, ~w, ~w, ~.1f, ~.1f, ~.1f, ~.1f, ~.1f, ~.1f, ~.1f, ~w\n",
+            Line = io_lib:format("~w, ~w, ~w, ~w, ~.1f, ~.1f, ~.1f, ~.1f, ~.1f, ~w, ~w\n",
                                  [Elapsed,
                                   Window,
                                   Units,
-                                  float(Min),
+                                  Min,
                                   float(Mean),
                                   float(basho_stats_histogram:quantile(0.500, Hist)),
                                   float(basho_stats_histogram:quantile(0.950, Hist)),
                                   float(basho_stats_histogram:quantile(0.990, Hist)),
                                   float(basho_stats_histogram:quantile(0.999, Hist)),
-                                  float(Max),
+                                  Max,
                                   Errors]),
-
             Perc = lists:map(fun(P) ->
                                  float(basho_stats_histogram:quantile(P, Hist))
                              end,
