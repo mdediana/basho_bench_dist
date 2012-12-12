@@ -118,14 +118,8 @@ op_csv_file({Label, _Op}, OutDir) ->
 op_perc_file({Label, _Op}, OutDir) ->
     Fname = OutDir ++ "/" ++ normalize_label(Label) ++ "_percentiles.csv",
     {ok, F} = file:open(Fname, [raw, binary, write]),
-    Header = lists:map(fun(N) ->
-                           case N rem 10 of
-                               1 -> integer_to_list(N) ++ "st";
-                               2 -> integer_to_list(N) ++ "nd";
-                               3 -> integer_to_list(N) ++ "rd";
-                               _ -> integer_to_list(N) ++ "th"
-                           end
-                       end, lists:seq(1, 99)) ++ ["99_9th"],
+    Header = lists:map(fun(N) -> "p" ++ integer_to_list(N) end,
+                       lists:seq(1, 99)) ++ ["99_9"],
     ok = file:write(F, string:concat(string:join(Header, ", "), "\n")),
     F.
 
