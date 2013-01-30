@@ -77,8 +77,8 @@ report_latency(Elapsed, Window, Op, Agg, OutDir) ->
     {Hist, Units, Errors} = dict:fetch(Op, Agg),
     case basho_stats_histogram:observations(Hist) > 0 of
         true ->
-            {Min, Mean, Max, _, _} = basho_stats_histogram:summary_stats(Hist),
-            Line = io_lib:format("~w, ~w, ~w, ~w, ~.1f, ~.1f, ~.1f, ~.1f, ~.1f, ~w, ~w\n",
+            {Min, Mean, Max, Var, Sdev} = basho_stats_histogram:summary_stats(Hist),
+            Line = io_lib:format("~w, ~w, ~w, ~w, ~.1f, ~.1f, ~.1f, ~.1f, ~.1f, ~w, ~.1f, ~.1f, ~w\n",
                                  [Elapsed,
                                   Window,
                                   Units,
@@ -89,6 +89,8 @@ report_latency(Elapsed, Window, Op, Agg, OutDir) ->
                                   float(basho_stats_histogram:quantile(0.990, Hist)),
                                   float(basho_stats_histogram:quantile(0.999, Hist)),
                                   Max,
+                                  Var,
+                                  Sdev,
                                   Errors]),
             Perc = lists:map(fun(P) ->
                                  float(basho_stats_histogram:quantile(P, Hist))
@@ -112,7 +114,7 @@ report_latency(Elapsed, Window, Op, Agg, OutDir) ->
 op_csv_file({Label, _Op}, OutDir) ->
     Fname = OutDir ++ "/" ++ normalize_label(Label) ++ "_latencies.csv",
     {ok, F} = file:open(Fname, [raw, binary, write]),
-    ok = file:write(F, <<"elapsed, window, n, min, mean, median, 95th, 99th, 99_9th, max, errors\n">>),
+    ok = file:write(F, <<"elapsed, window, n, min, mean, median, 95th, 99th, 99_9th, max, var, sdev, errors\n">>),
     F.
 
 op_perc_file({Label, _Op}, OutDir) ->
