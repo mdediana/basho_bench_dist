@@ -121,7 +121,7 @@ op_perc_file({Label, _Op}, OutDir) ->
     Fname = OutDir ++ "/" ++ normalize_label(Label) ++ "_percentiles.csv",
     {ok, F} = file:open(Fname, [raw, binary, write]),
     Header = lists:map(fun(N) -> "p" ++ integer_to_list(N) end,
-                       lists:seq(1, 99)) ++ ["99_9"],
+                       lists:seq(1, 99)) ++ ["p99_9"],
     ok = file:write(F, string:concat(string:join(Header, ", "), "\n")),
     F.
 
